@@ -32,6 +32,11 @@ class BrowserManager {
                 url: 'https://gemini.google.com/app',
                 partition: 'persist:gemini',
                 color: '#4285f4'
+            },
+            grok: {
+                url: 'https://grok.com/',
+                partition: 'persist:grok',
+                color: '#000000'
             }
         };
 
@@ -608,7 +613,8 @@ class BrowserManager {
                 perplexity: 'perplexity.ai',
                 chatgpt: 'chatgpt.com',
                 claude: 'claude.ai',
-                gemini: 'gemini.google.com'
+                gemini: 'gemini.google.com',
+                grok: 'grok.com'
             };
 
             const domain = providerDomains[provider];
@@ -820,6 +826,23 @@ class BrowserManager {
                             const hasSignIn = !!document.querySelector('a[href*="ServiceLogin"]') ||
                                             !!document.querySelector('a[data-action-id="sign-in"]');
                             return hasInput && !hasSignIn;
+                        })()
+                    `);
+                case 'grok':
+                    return await webContents.executeJavaScript(`
+                        (function() {
+                            const buttons = Array.from(document.querySelectorAll('button, a'));
+                            const hasLoginBtn = buttons.some(b => {
+                                const t = (b.innerText || '').trim();
+                                return t === 'Log in' || t === 'Sign in' || t === 'Sign up' || t === 'Sign Up';
+                            });
+                            if (hasLoginBtn) return false;
+                            const hasComposer = !!document.querySelector('textarea') ||
+                                               !!document.querySelector('[contenteditable="true"]') ||
+                                               !!document.querySelector('div[contenteditable]');
+                            const onLoginPage = window.location.href.includes('auth.x.com') ||
+                                               window.location.href.includes('/login');
+                            return hasComposer && !onLoginPage;
                         })()
                     `);
                 default:
