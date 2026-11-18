@@ -661,36 +661,48 @@ function stopAgentUiServer() {
 function waitForAgentReadiness(proc, timeoutMs = 5000, port = 8500) {
     return new Promise((resolve, reject) => {
         if (!proc) return reject(new Error('No agent process provided'));
-        let exited = false;
-        let exitCode = null;
+        let settled = false;
+        let interval = null;
+        let timeout = null;
+
+        const cleanup = () => {
+            settled = true;
+            if (interval) clearInterval(interval);
+            if (timeout) clearTimeout(timeout);
+            proc.removeListener('exit', onExit);
+        };
 
         const onExit = (code) => {
-            exited = true;
-            exitCode = code;
+            if (settled) return;
+            cleanup();
+            reject(new Error(`Agent process exited early with code ${code}`));
         };
+
+        if (proc.exitCode !== null) {
+            return reject(new Error(`Agent process exited early with code ${proc.exitCode}`));
+        }
+
         proc.once('exit', onExit);
 
-        const startTime = Date.now();
-        const interval = setInterval(() => {
-            if (exited) {
-                clearInterval(interval);
-                proc.removeListener('exit', onExit);
-                return reject(new Error(`Agent process exited early with code ${exitCode}`));
-            }
-            if (Date.now() - startTime > timeoutMs) {
-                clearInterval(interval);
-                proc.removeListener('exit', onExit);
-                return reject(new Error(`Agent startup timed out after ${timeoutMs}ms`));
-            }
+        timeout = setTimeout(() => {
+            if (settled) return;
+            cleanup();
+            reject(new Error(`Agent startup timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+
+        const checkHttp = () => {
+            if (settled) return;
             const req = http.get(`http://127.0.0.1:${port}/`, (res) => {
-                clearInterval(interval);
-                proc.removeListener('exit', onExit);
+                if (settled) return;
+                cleanup();
                 res.resume();
                 resolve(true);
             });
             req.on('error', () => {});
-        }, 150);
-        if (interval.unref) interval.unref();
+        };
+
+        checkHttp();
+        interval = setInterval(checkHttp, 150);
     });
 }
 

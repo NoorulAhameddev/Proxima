@@ -187,6 +187,9 @@ print("PYTHON_SDK_BASE_URL_OK")
 
     const pythonEnv = require('../../electron/python-env.cjs');
     const pyExe = pythonEnv.resolveInterpreter() || (process.platform === 'win32' ? 'python' : 'python3');
+    if (!pythonEnv.isInterpreterUsable(pyExe, false)) {
+        return; // Skip when Python interpreter is unavailable or restricted by host policy
+    }
     const res = spawnSync(pyExe, ['-c', pythonScript], { encoding: 'utf8' });
     assert.equal(res.status, 0, `Python SDK validation failed: ${res.stderr}`);
     assert.match(res.stdout, /PYTHON_SDK_BASE_URL_OK/);
